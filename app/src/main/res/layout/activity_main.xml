@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/panels"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:keepScreenOn="true"
+    android:background="#000000"
+    android:orientation="horizontal" >
+
+    <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        xmlns:tools="http://schemas.android.com/tools"
+        android:id="@+id/panels1"
+        android:layout_width="1920px"
+        android:layout_height="fill_parent"
+        android:orientation="vertical" >
+
+        <SurfaceView
+            android:id="@+id/preview_view"
+            android:layout_width="1920px"
+            android:layout_height="1080px" />
+
+        <TextView
+            android:id="@+id/textViewStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:textColor="#00FF00"
+            android:text="starting..."
+            android:textSize="12sp" />
+
+    </LinearLayout>
+
+
+
+    <ScrollView
+        android:id="@+id/controls_scroll"
+        android:layout_width="0dp"
+        android:layout_height="fill_parent"
+        android:layout_weight="2">
+
+        <LinearLayout
+            android:id="@+id/control_bar_contents"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="5dp"
+            android:background="#000000"
+            android:orientation="vertical" >
+
+
+            <Button android:id="@+id/button_on_off"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:layout_gravity="left"
+                android:text="Turn off"
+                android:textSize="10sp"/>
+
+            <Spinner
+                android:background="#009000"
+                android:id="@+id/spinner_camera_num"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:spinnerMode="dropdown"
+                />
+
+            <EditText
+                android:textColor="@color/colorAccent"
+                android:id="@+id/bitrate"
+                android:layout_width="match_parent"
+                android:text="9000000"
+                android:inputType="numberDecimal"
+                android:layout_height="match_parent"
+                android:enabled="false"
+                />
+
+            <Spinner
+                android:background="#009000"
+                android:id="@+id/spinner_resolution"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:spinnerMode="dropdown"
+                android:prompt="@string/resolution"
+                />
+
+            <Spinner
+                android:background="#009000"
+                android:id="@+id/spinner_AVC_HEVC"
+                android:layout_width="fill_parent"
+                android:layout_height="wrap_content"
+                android:spinnerMode="dropdown"
+                />
+
+        </LinearLayout>
+    </ScrollView>
+
+</LinearLayout>
