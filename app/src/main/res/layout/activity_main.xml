@@ -9,12 +9,10 @@
     android:background="#000000"
     android:orientation="horizontal" >
 
-    <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-        xmlns:tools="http://schemas.android.com/tools"
-        android:id="@+id/panels1"
+    <FrameLayout
         android:layout_width="1920px"
-        android:layout_height="fill_parent"
-        android:orientation="vertical" >
+        android:layout_height="1080px"
+        android:layout_weight="1">
 
         <SurfaceView
             android:id="@+id/preview_view"
@@ -27,15 +25,16 @@
             android:layout_height="wrap_content"
             android:textColor="#00FF00"
             android:text="starting..."
+            android:layout_gravity="bottom"
             android:textSize="12sp" />
 
-    </LinearLayout>
+    </FrameLayout>
 
 
 
     <ScrollView
         android:id="@+id/controls_scroll"
-        android:layout_width="0dp"
+        android:layout_width="100dp"
         android:layout_height="fill_parent"
         android:layout_weight="2">
 
@@ -67,7 +66,7 @@
                 android:textColor="@color/colorAccent"
                 android:id="@+id/bitrate"
                 android:layout_width="match_parent"
-                android:text="9000000"
+                android:text="6000000"
                 android:inputType="numberDecimal"
                 android:layout_height="match_parent"
                 android:enabled="false"
