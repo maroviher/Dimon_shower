@@ -7,6 +7,7 @@ import android.util.Log;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
+import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
@@ -21,7 +22,7 @@ public class ConnectionLoop implements Runnable {
     MainActivity mMainActivity;
 
     AudioOutgoing mAudioOutgoing = new AudioOutgoing();
-    SendDataThread mSendDataThread = new SendDataThread();
+    SendDataThread mSendDataThread = null;
     AudioIncoming mAudioIncoming = new AudioIncoming();
     private final byte frame_type_audio = 4, frame_type_audioConfig = 6;
 
@@ -31,9 +32,9 @@ public class ConnectionLoop implements Runnable {
         mMainActivity = mainActivity;
     }
 
-    public boolean IsThreadRunning() {
+    /*public boolean IsThreadRunning() {
         return !(m_thread == null);
-    }
+    }*/
 
     public void StartConnectionListenerLoop() {
         mbConnectThreadShouldRun = true;
@@ -43,13 +44,14 @@ public class ConnectionLoop implements Runnable {
     }
 
     public void StopConnectionListenerLoop() {
+        mbConnectThreadShouldRun = false;
+
         mAudioIncoming.Stop();
         mAudioOutgoing.Stop();
         mMainActivity.mVideoOutgoing.Stop();
         mSendDataThread.Stop();
         mSendDataThread = null;
 
-        mbConnectThreadShouldRun = false;
         if (mServerSocketChannel != null) {
             try {
                 mServerSocketChannel.close();
@@ -66,7 +68,7 @@ public class ConnectionLoop implements Runnable {
         }
 
         try {
-            if(m_thread != null) {
+            if (m_thread != null) {
                 mAudioIncoming.mFifoAudioIn.put(-2);
                 m_thread.join();
                 m_thread = null;
@@ -74,120 +76,23 @@ public class ConnectionLoop implements Runnable {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
-/*
-            NotifyConnectionLostOrExit();
-
-            try {
-                if(m_thread != null) {
-                    m_thread.join();
-                    m_thread = null;
-                }
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }*/
     }
-/*
-        @Override
-        public void onInputBufferAvailable(@NonNull MediaCodec mediaCodec, int i) {
-            if(mAudioCodec == mediaCodec)
-                AddInputAudioBufferToQueue(i);
-        }
-
-        @Override
-        public void onOutputBufferAvailable(@NonNull MediaCodec mediaCodec, int i, @NonNull MediaCodec.BufferInfo bufferInfo) {
-            if(!m_bConnected) {
-                try {
-                    mediaCodec.releaseOutputBuffer(i, true);
-                } catch (IllegalStateException ex) {
-                    Log.d("------", "IllegalStateException in mediaCodec.releaseOutputBuffer");
-                }
-                return;
-            }
-            boolean bConn_lost = false;
-            if(m_bAfterReconnect)
-            {
-                m_bAfterReconnect = false;
-
-                try {
-                    AfterReconnect();
-                    AudioAfterReconnect();
-                } catch (IOException e) {
-                    if (bConn_lost) {
-                        m_bConnected = false;
-
-                        CleanUPSockets();
-                        NotifyConnectionLostOrExit();
-                    }
-                    mediaCodec.releaseOutputBuffer(i, true);
-                    return;
-                }
-            }
-
-            try {
-                ByteBuffer buf = mediaCodec.getOutputBuffer(i);
-                byte[] bytes = IntToByteArr(bufferInfo.size);
-                ByteBuffer bbufLen = ByteBuffer.wrap(bytes);
-                byte[] DataType = new byte[1];
-                if (mAudioCodec == mediaCodec) {
-                    DataType[0] = frame_type_audio;
-                }
-                else if (mVideoCodecEncoder == mediaCodec) {
-                    DataType[0] = frame_type_video;
-                }
-                switch (bufferInfo.flags) {
-                    case 0://normal frame
-                        break;
-                    case 1://BUFFER_FLAG_KEY_FRAME
-                        break;
-                    case 2://BUFFER_FLAG_CODEC_CONFIG
-                        ByteBuffer bb = ByteBuffer.allocate(buf.limit());
-                        buf.rewind();
-                        bb.put(buf);
-                        buf.rewind();
-                        bb.flip();
-                        if (mAudioCodec == mediaCodec) {
-                            m_bbufConfigAudio = bb;
-                            DataType[0] = frame_type_audio;
-                        }
-                        else if (mVideoCodecEncoder == mediaCodec) {
-                            m_bbufConfigVideo = bb;
-                            DataType[0] = frame_type_video;
-                        }
-                        break;
-                }
-                //Log.d("--------", "bufferInfo.size=" + bufferInfo.size + " DataType[0]=" + DataType[0]);
-
-                int iSent = 0;
-                //send TLV
-                iSent += mSocketChannel.write(ByteBuffer.wrap(DataType));
-                iSent += mSocketChannel.write(bbufLen);
-                iSent += mSocketChannel.write(buf);
-                if (iSent != 1 + 4 + bufferInfo.size) {
-                    Log.d("--------", "overflow");
-                    bConn_lost = true;
-                }
-            } catch (IOException e) {
-                Log.d("--------", "IOException");
-                bConn_lost = true;
-            }
-
-            if (bConn_lost) {
-                m_bConnected = false;
-                //CleanUPSockets();
-                //NotifyConnectionLostOrExit();
-            }
-            mediaCodec.releaseOutputBuffer(i, true);
-        }
-
-        @Override
-        public void onError(@NonNull MediaCodec mediaCodec, @NonNull MediaCodec.CodecException e) {
-        }
-
-        @Override
-        public void onOutputFormatChanged(@NonNull MediaCodec mediaCodec, @NonNull MediaFormat mediaFormat) {
-        }*/
 
     SocketChannel ListenForHost() throws IOException {
+        if (mServerSocketChannel != null) {
+            try {
+                mServerSocketChannel.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+        if (mSocketChannel != null) {
+            try {
+                mSocketChannel.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
         mServerSocketChannel = ServerSocketChannel.open();
         mServerSocketChannel.socket().setReuseAddress(true);
         mServerSocketChannel.socket().bind(new InetSocketAddress(5001));
@@ -195,7 +100,7 @@ public class ConnectionLoop implements Runnable {
         mSocketChannel = mServerSocketChannel.accept();
         mSocketChannel.socket().setSendBufferSize(2 * mMainActivity.GetBitrate() / 8);//send buffer as big as for 2 seconds
         mInputStream = mSocketChannel.socket().getInputStream();
-        //mSocketChannel.socket().setSoTimeout(2000);
+        mSocketChannel.socket().setSoTimeout(5000);
         //mSocketChannel.configureBlocking(false);
         mServerSocketChannel.close();
         mServerSocketChannel = null;
@@ -221,45 +126,6 @@ public class ConnectionLoop implements Runnable {
             }
         }
     }
-        /*private void AudioAfterReconnect() throws IOException {
-            //after reconnect first send a buffer with codec config saved before
-            if (m_bbufConfigAudio != null) {
-                byte[] bytes = IntToByteArr(m_bbufConfigAudio.limit());
-                byte[] DataType = new byte[1];DataType[0] = frame_type_audio;
-                mSocketChannel.write(ByteBuffer.wrap(DataType));
-                mSocketChannel.write(ByteBuffer.wrap(bytes));
-                mSocketChannel.write(m_bbufConfigAudio);
-                m_bbufConfigAudio.rewind();
-            }
-        }
-
-        private void NotifyConnectionLostOrExit() {
-            lockConnected.lock();
-            try {
-                m_bConnectionLostOrExit = true;
-                Log.d("------", "Notifying to reconnect");
-                condVarExitOrDisconnect.signalAll();
-            } finally {
-                lockConnected.unlock();
-            }
-        }
-
-        private void WaitForExitOrDisconnect() {
-            Log.d("------", "Waiting for reconnect");
-            lockConnected.lock();
-            try {
-                while(!m_bConnectionLostOrExit) {
-                    try {
-                        condVarExitOrDisconnect.await();
-                    } catch (InterruptedException x) {}
-                }
-            } finally {
-                m_bConnectionLostOrExit = false;
-                lockConnected.unlock();
-            }
-            Log.d("------", "Notified to reconnect");
-        }*/
-
 
     private boolean read_exact(byte buf[], int cnt) throws IOException {
         int iToRead = cnt;
@@ -329,14 +195,7 @@ public class ConnectionLoop implements Runnable {
 
                 while(mbConnectThreadShouldRun) {
                     try {
-                        TagAndLength tagAndLength;
-
-                        try {
-                            tagAndLength = ReadDataTypeAndFrameLength();
-                        }catch(Exception ex) {
-                            mMainActivity.setMessage(ex.getMessage());
-                            break;
-                        }
+                        TagAndLength tagAndLength = ReadDataTypeAndFrameLength();
 
                         switch(tagAndLength.dataType) {
                             case frame_type_audio:
@@ -375,6 +234,11 @@ public class ConnectionLoop implements Runnable {
                         }
                         mAudioIncoming.mMediaCodecAudioDecoder.queueInputBuffer(inputBufferId, 0, tagAndLength.iFrameLen, 0, 0);
 
+                    } catch(SocketTimeoutException sex) {
+                        mMainActivity.setMessage("SocketTimeoutException");
+                        mMainActivity.mCameraCaptureSession.stopRepeating();
+                        mAudioOutgoing.Pause();
+                        break;
                     } catch (Exception ex) {
                         mMainActivity.setMessage(ex.getMessage());
                         mMainActivity.mCameraCaptureSession.stopRepeating();
@@ -387,7 +251,7 @@ public class ConnectionLoop implements Runnable {
             }
         } //while (mbConnectThreadShouldRun) {
 
-        //mAudioOutgoing.Stop();
+        mAudioOutgoing.Stop();
         if(mMainActivity.mCameraCaptureSession != null)
             mMainActivity.mCameraCaptureSession.close();
 

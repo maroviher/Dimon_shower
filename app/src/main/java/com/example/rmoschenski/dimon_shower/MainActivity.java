@@ -51,8 +51,9 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ad
     String mStrCameraToUse;
     private ArrayList<View> views_to_fade = new ArrayList<>();
     private boolean m_b_UsePreview = true;
-    private final int MY_PERMISSIONS_RECORD_AUDIO = 1, MY_PERMISSIONS_RECORD_VIDEO = 2;
-    ConnectionLoop mConnectionLoop = new ConnectionLoop(this);
+    MainActivity mMainActivity;
+    public static final int MULTIPLE_PERMISSIONS = 10;
+    ConnectionLoop mConnectionLoop = null;
     VideoOutgoing mVideoOutgoing = new VideoOutgoing();
 
     Queue<String> mQueueString = new ArrayDeque<>();
@@ -74,64 +75,34 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ad
         });
     }
 
-
-    private void requestAudioPermissions() {
-        if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.RECORD_AUDIO)
-                != PackageManager.PERMISSION_GRANTED) {
-
-            //When permission is not granted by user, show them message why this permission is needed.
-            if (ActivityCompat.shouldShowRequestPermissionRationale(this,
-                    Manifest.permission.RECORD_AUDIO)) {
-                Toast.makeText(this, "Please grant permissions to record audio", Toast.LENGTH_LONG).show();
-
-                //Give user option to still opt-in the permissions
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.RECORD_AUDIO},
-                        MY_PERMISSIONS_RECORD_AUDIO);
-
-            } else {
-                // Show user dialog to grant permission to record audio
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.RECORD_AUDIO},
-                        MY_PERMISSIONS_RECORD_AUDIO);
+    String[] permissions= new String[]{Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA};
+    private  boolean checkPermissions() {
+        int result;
+        List<String> listPermissionsNeeded = new ArrayList<>();
+        for (String p : permissions) {
+            result = ContextCompat.checkSelfPermission(this, p);
+            if (result != PackageManager.PERMISSION_GRANTED) {
+                listPermissionsNeeded.add(p);
             }
         }
-        //If permission is granted, then go ahead recording audio
-        else if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.RECORD_AUDIO)
-                == PackageManager.PERMISSION_GRANTED) {
+        if (!listPermissionsNeeded.isEmpty()) {
+            ActivityCompat.requestPermissions(this, listPermissionsNeeded.toArray(new String[listPermissionsNeeded.size()]),MULTIPLE_PERMISSIONS );
+            return false;
         }
-        else
-        {
-            Log.d("qwe", "efd");
-        }
+        return true;
     }
 
-    private void requestVideoPermissions() {
-        if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.CAMERA)
-                != PackageManager.PERMISSION_GRANTED) {
 
-            //When permission is not granted by user, show them message why this permission is needed.
-            if (ActivityCompat.shouldShowRequestPermissionRationale(this,
-                    Manifest.permission.CAMERA)) {
-                Toast.makeText(this, "Please grant permissions to record video", Toast.LENGTH_LONG).show();
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String permissions[], int[] grantResults) {
+        switch (requestCode) {
+            case MULTIPLE_PERMISSIONS: {
+                for (int i : grantResults) {
+                    if (grantResults[i] != PackageManager.PERMISSION_GRANTED) {
 
-                //Give user option to still opt-in the permissions
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.CAMERA},
-                        MY_PERMISSIONS_RECORD_VIDEO);
-
-            } else {
-                // Show user dialog to grant permission to record audio
-                ActivityCompat.requestPermissions(this,
-                        new String[]{Manifest.permission.CAMERA},
-                        MY_PERMISSIONS_RECORD_VIDEO);
+                    }
+                }
             }
-        } else if (ContextCompat.checkSelfPermission(this,
-                Manifest.permission.CAMERA)
-                == PackageManager.PERMISSION_GRANTED) {
         }
     }
 
@@ -186,18 +157,8 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ad
         mAVC_HEVC.setAdapter(codecAdapter);
     }
 
-    @Override
-    public void onRequestPermissionsResult(int i, String permissions[], int[] grantResults) {
-        /*if (i == iCameraPermissionID)
-            OpenAndStartCamera();*/
-    }
-
     private void OpenAndStartCamera() {
-        /*if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) == PackageManager.PERMISSION_DENIED) {
-            ActivityCompat.requestPermissions(this, new String[]{Manifest.permission.CAMERA}, iCameraPermissionID);
-            return;
-        }*/
-
+        mMainActivity = this;
         CameraManager cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try {
             cameraManager.openCamera(mCameraNumSpinner.getSelectedItem().toString(), new CameraDevice.StateCallback() {
@@ -229,8 +190,10 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ad
                                 Log.i("", "capture session configured: " + session);
                                 mCameraCaptureSession = session;
 
-                                if(!mConnectionLoop.IsThreadRunning())
+                                if(null == mConnectionLoop) {
+                                    mConnectionLoop = new ConnectionLoop(mMainActivity);
                                     mConnectionLoop.StartConnectionListenerLoop();
+                                }
                                 else
                                     Log.e("error", "mConnectionLoop.IsThreadRunning()" + session);
                             }
@@ -244,14 +207,16 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ad
                     } catch (CameraAccessException e) {
                         Log.e("error", "couldn't create capture session for camera: " + camera.getId(), e);
                         mCameraCaptureSession = null;
-                        return;
                     }
                 }
 
                 @Override
                 public void onDisconnected(CameraDevice camera) {
                     Log.d("onDisconnected", "deviceCallback.onDisconnected() start");
-                    mConnectionLoop.StopConnectionListenerLoop();
+                    if (null != mConnectionLoop) {
+                        mConnectionLoop.StopConnectionListenerLoop();
+                        mConnectionLoop = null;
+                    }
                 }
 
                 @Override
@@ -273,8 +238,8 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ad
 
         getWindow().setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
-        requestVideoPermissions();
-        requestAudioPermissions();
+        if(!checkPermissions())
+            return;
 
         //Allow network operations on GUI thread
         StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
@@ -295,7 +260,10 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ad
             public void onClick(View v) {
                 String str = mButOnOff.getText().toString();
                 if (str.equals("Turn off")) {
-                    mConnectionLoop.StopConnectionListenerLoop();
+                    if (null != mConnectionLoop) {
+                        mConnectionLoop.StopConnectionListenerLoop();
+                        mConnectionLoop = null;
+                    }
 
                     for (View view : views_to_fade)
                         view.setEnabled(true);

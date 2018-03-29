@@ -35,7 +35,7 @@ public class AudioOutgoing extends Thread {
             return;
 
         m_audio_recorder = new AudioRecord(
-                MediaRecorder.AudioSource.MIC,       // MediaRecorder.AudioSource.VOICE_COMMUNICATION for echo cancellation
+                MediaRecorder.AudioSource.VOICE_COMMUNICATION,       // MediaRecorder.AudioSource.VOICE_COMMUNICATION for echo cancellation
                 SAMPLE_RATE,                         // sample rate, hz
                 AudioFormat.CHANNEL_IN_MONO,                      // channels
                 AudioFormat.ENCODING_PCM_16BIT,                        // audio format
@@ -69,7 +69,12 @@ public class AudioOutgoing extends Thread {
 
             m_buf_config.rewind();
 
-            m_audio_recorder.startRecording();
+            try {
+                m_audio_recorder.startRecording();
+            } catch (NullPointerException np) {
+                int tt=1;
+            }
+
         }
     }
 

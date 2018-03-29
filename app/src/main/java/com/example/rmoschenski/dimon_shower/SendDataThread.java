@@ -87,7 +87,7 @@ public class SendDataThread extends Thread implements I_CompressedBufferAvailabl
                 bbuf.rewind();
                 mSocketChannel.write(bbuf);
             } catch (IOException e) {
-                //e.printStackTrace();
+                e.printStackTrace();
             } catch (IllegalStateException ise) {
                 ise.printStackTrace();
             }
