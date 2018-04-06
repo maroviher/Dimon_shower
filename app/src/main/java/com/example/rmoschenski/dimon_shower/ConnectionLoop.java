@@ -9,6 +9,8 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.net.SocketTimeoutException;
 import java.nio.ByteBuffer;
+import java.nio.channels.Channels;
+import java.nio.channels.ReadableByteChannel;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 
@@ -18,6 +20,7 @@ public class ConnectionLoop implements Runnable {
 
     ServerSocketChannel mServerSocketChannel;
     SocketChannel mSocketChannel;
+    ReadableByteChannel mWrappedSocketChannel;
     InputStream mInputStream;
     MainActivity mMainActivity;
 
@@ -100,7 +103,8 @@ public class ConnectionLoop implements Runnable {
         mSocketChannel = mServerSocketChannel.accept();
         mSocketChannel.socket().setSendBufferSize(2 * mMainActivity.GetBitrate() / 8);//send buffer as big as for 2 seconds
         mInputStream = mSocketChannel.socket().getInputStream();
-        mSocketChannel.socket().setSoTimeout(5000);
+        mSocketChannel.socket().setSoTimeout(1000);
+        mWrappedSocketChannel = Channels.newChannel(mInputStream);
         //mSocketChannel.configureBlocking(false);
         mServerSocketChannel.close();
         mServerSocketChannel = null;
@@ -223,7 +227,8 @@ public class ConnectionLoop implements Runnable {
                             inputBuffer.limit(tagAndLength.iFrameLen);
 
                             while(inputBuffer.position() < tagAndLength.iFrameLen) {
-                                mSocketChannel.read(inputBuffer);
+                                if(mWrappedSocketChannel.read(inputBuffer) <= 0)
+                                    throw new IOException();
                             }
                         }catch (IllegalStateException ex) {
                             mMainActivity.setMessage("IllegalStateException in AudioIncoming codec");
