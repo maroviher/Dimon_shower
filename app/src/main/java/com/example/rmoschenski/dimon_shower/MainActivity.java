@@ -241,10 +241,6 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ad
         if(!checkPermissions())
             return;
 
-        //Allow network operations on GUI thread
-        StrictMode.ThreadPolicy policy = new StrictMode.ThreadPolicy.Builder().permitAll().build();
-        StrictMode.setThreadPolicy(policy);
-
         setContentView(R.layout.activity_main);
         mPreviewView = findViewById(R.id.preview_view);
         mPreviewView.getHolder().addCallback(this);
