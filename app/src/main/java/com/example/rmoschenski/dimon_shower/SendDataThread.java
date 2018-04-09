@@ -86,10 +86,10 @@ public class SendDataThread extends Thread implements I_CompressedBufferAvailabl
                 ByteBuffer bbuf = ByteBuffer.allocate(1 + 4 + bbufCodec.limit()).put(bufTagAndLen).put(bbufCodec);
                 bbuf.rewind();
                 mSocketChannel.write(bbuf);
-            } catch (IOException e) {
-                e.printStackTrace();
             } catch (IllegalStateException ise) {
                 ise.printStackTrace();
+            } catch (Exception e) {
+                e.printStackTrace();
             }
             finally {
                 try {

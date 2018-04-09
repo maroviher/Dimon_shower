@@ -21,11 +21,11 @@ public class AudioIncoming {
     AudioTrack mAudioTrack;
     public BlockingQueue<Integer> mFifoAudioIn = new LinkedBlockingQueue<Integer>();
 
-    public void Start() {
-        mFifoAudioIn.clear();
-        mAudioTrack = new AudioTrack(AudioManager.STREAM_MUSIC, SAMPLE_RATE,
+    public void Start(int iAECid) {
+        mAudioTrack = new AudioTrack(AudioManager.MODE_IN_COMMUNICATION, SAMPLE_RATE,
                 AudioFormat.CHANNEL_OUT_MONO,
-                AudioFormat.ENCODING_PCM_16BIT, SAMPLE_RATE * 2 / 10 * 2, AudioTrack.MODE_STREAM);
+                AudioFormat.ENCODING_PCM_16BIT, SAMPLE_RATE * 2 / 10 * 2,
+                AudioTrack.MODE_STREAM, iAECid);
 
         if(null == (mMediaCodecAudioDecoder = InitAudioDecoder()))
             return;

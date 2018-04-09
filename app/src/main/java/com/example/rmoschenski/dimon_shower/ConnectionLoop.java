@@ -103,7 +103,7 @@ public class ConnectionLoop implements Runnable {
         mSocketChannel = mServerSocketChannel.accept();
         mSocketChannel.socket().setSendBufferSize(2 * mMainActivity.GetBitrate() / 8);//send buffer as big as for 2 seconds
         mInputStream = mSocketChannel.socket().getInputStream();
-        mSocketChannel.socket().setSoTimeout(1000);
+        mSocketChannel.socket().setSoTimeout(2000);
         mWrappedSocketChannel = Channels.newChannel(mInputStream);
         //mSocketChannel.configureBlocking(false);
         mServerSocketChannel.close();
@@ -181,9 +181,9 @@ public class ConnectionLoop implements Runnable {
                 mSendDataThread.SetSocketChannel(socketChannel);
 
                 if(bFirstConnect) {
-                    mAudioOutgoing.Start(mSendDataThread);
+                    int iAudioCapSessionID = mAudioOutgoing.Start(mSendDataThread);
                     mMainActivity.mVideoOutgoing.Start(mSendDataThread);
-                    mAudioIncoming.Start();
+                    mAudioIncoming.Start(iAudioCapSessionID);
                     bFirstConnect = false;
                 }
                 else {

@@ -6,6 +6,9 @@ import android.media.MediaCodec;
 import android.media.MediaCodecInfo;
 import android.media.MediaFormat;
 import android.media.MediaRecorder;
+import android.media.audiofx.AcousticEchoCanceler;
+import android.media.audiofx.AutomaticGainControl;
+import android.media.audiofx.NoiseSuppressor;
 import android.support.annotation.NonNull;
 import android.util.Log;
 
@@ -25,14 +28,28 @@ public class AudioOutgoing extends Thread {
     boolean m_bAudioThreadShoudRun = false, m_bRunning = false;
     I_CompressedBufferAvailable mI_CompressedBufferAvailable;
     ByteBuffer m_buf_config;
+    boolean b_useAGC = false;
+    AcousticEchoCanceler m_acousticEchoCanceler;
+    NoiseSuppressor m_noiseSuppressor;
+    AutomaticGainControl m_aAutomaticGainControl;
 
-    public void Start(I_CompressedBufferAvailable iI_CompressedBufferAvailable) {
+    public int Start(I_CompressedBufferAvailable iI_CompressedBufferAvailable) throws Exception {
+        if(!NoiseSuppressor.isAvailable()) {
+            throw new Exception("NoiseSuppressor not available");
+        }
+        if(!AcousticEchoCanceler.isAvailable()) {
+            throw new Exception("AcousticEchoCanceler not available");
+        }
+        if(b_useAGC && !AutomaticGainControl.isAvailable()) {
+            throw new Exception("AutomaticGainControl not available");
+        }
+
         mI_CompressedBufferAvailable = iI_CompressedBufferAvailable;
         configureMediaCodecEncoderAudio();
         int min_buffer_size = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT);
         if (AudioRecord.ERROR_BAD_VALUE == min_buffer_size)
-            return;
+            throw new Exception("Audio not init");
 
         m_audio_recorder = new AudioRecord(
                 MediaRecorder.AudioSource.VOICE_COMMUNICATION,       // MediaRecorder.AudioSource.VOICE_COMMUNICATION for echo cancellation
@@ -42,14 +59,30 @@ public class AudioOutgoing extends Thread {
                 SAMPLE_RATE * 2 / 10);                     // buffer size 1/10 sec
 
         if (m_audio_recorder.getState() != AudioRecord.STATE_INITIALIZED) {
-            return;
+            throw new Exception("AudioRecord STATE_INITIALIZED");
         }
 
         mFifoAudioInputBuffers.clear();
-        mAudioCodec.start();
-        m_audio_recorder.startRecording();
         m_bAudioThreadShoudRun = true;
         start();
+        mAudioCodec.start();
+        Setup_AEC_GainControl_NoiseSuppressor(m_audio_recorder.getAudioSessionId());
+        m_audio_recorder.startRecording();
+
+        return m_audio_recorder.getAudioSessionId();
+    }
+
+    private void Setup_AEC_GainControl_NoiseSuppressor(int i) {
+        m_acousticEchoCanceler = AcousticEchoCanceler.create(i);
+        m_acousticEchoCanceler.setEnabled(true);
+
+        m_noiseSuppressor = NoiseSuppressor.create(i);
+        m_noiseSuppressor.setEnabled(true);
+
+        if(b_useAGC) {
+            m_aAutomaticGainControl = AutomaticGainControl.create(i);
+            m_aAutomaticGainControl.setEnabled(true);
+        }
     }
 
     void Pause() {
@@ -57,7 +90,7 @@ public class AudioOutgoing extends Thread {
             m_audio_recorder.stop();
     }
 
-    public void AfterReconnect() throws IOException {
+    public void AfterReconnect() {
         //after reconnect first send a buffer with codec config saved before
         if (m_buf_config != null) {
             MyOutputBuffer myOutputBuffer = new MyOutputBuffer();
@@ -69,12 +102,7 @@ public class AudioOutgoing extends Thread {
 
             m_buf_config.rewind();
 
-            try {
-                m_audio_recorder.startRecording();
-            } catch (NullPointerException np) {
-                int tt=1;
-            }
-
+            m_audio_recorder.startRecording();
         }
     }
 
