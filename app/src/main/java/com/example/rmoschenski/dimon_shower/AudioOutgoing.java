@@ -20,7 +20,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 public class AudioOutgoing extends Thread {
 
     private static final String MIME_TYPE = "audio/mp4a-latm";
-    private static final int SAMPLE_RATE = 44100;
     private static final int BIT_RATE = 32000;
     MediaCodec mAudioCodec;
     private BlockingQueue<Integer> mFifoAudioInputBuffers = new LinkedBlockingQueue<>();
@@ -28,35 +27,25 @@ public class AudioOutgoing extends Thread {
     boolean m_bAudioThreadShoudRun = false, m_bRunning = false;
     I_CompressedBufferAvailable mI_CompressedBufferAvailable;
     ByteBuffer m_buf_config;
-    boolean b_useAGC = false;
     AcousticEchoCanceler m_acousticEchoCanceler;
     NoiseSuppressor m_noiseSuppressor;
     AutomaticGainControl m_aAutomaticGainControl;
+    String mStrFeatures;
 
-    public int Start(I_CompressedBufferAvailable iI_CompressedBufferAvailable) throws Exception {
-        if(!NoiseSuppressor.isAvailable()) {
-            throw new Exception("NoiseSuppressor not available");
-        }
-        if(!AcousticEchoCanceler.isAvailable()) {
-            throw new Exception("AcousticEchoCanceler not available");
-        }
-        if(b_useAGC && !AutomaticGainControl.isAvailable()) {
-            throw new Exception("AutomaticGainControl not available");
-        }
-
+    public int Start(I_CompressedBufferAvailable iI_CompressedBufferAvailable, int iSampleRate) throws Exception {
         mI_CompressedBufferAvailable = iI_CompressedBufferAvailable;
-        configureMediaCodecEncoderAudio();
-        int min_buffer_size = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO,
+        configureMediaCodecEncoderAudio(iSampleRate);
+        int min_buffer_size = AudioRecord.getMinBufferSize(iSampleRate, AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT);
         if (AudioRecord.ERROR_BAD_VALUE == min_buffer_size)
             throw new Exception("Audio not init");
 
         m_audio_recorder = new AudioRecord(
                 MediaRecorder.AudioSource.VOICE_COMMUNICATION,       // MediaRecorder.AudioSource.VOICE_COMMUNICATION for echo cancellation
-                SAMPLE_RATE,                         // sample rate, hz
+                iSampleRate,                         // sample rate, hz
                 AudioFormat.CHANNEL_IN_MONO,                      // channels
                 AudioFormat.ENCODING_PCM_16BIT,                        // audio format
-                SAMPLE_RATE * 2 / 10);                     // buffer size 1/10 sec
+                iSampleRate * 2 / 10);                     // buffer size 1/10 sec
 
         if (m_audio_recorder.getState() != AudioRecord.STATE_INITIALIZED) {
             throw new Exception("AudioRecord STATE_INITIALIZED");
@@ -72,17 +61,38 @@ public class AudioOutgoing extends Thread {
         return m_audio_recorder.getAudioSessionId();
     }
 
-    private void Setup_AEC_GainControl_NoiseSuppressor(int i) {
-        m_acousticEchoCanceler = AcousticEchoCanceler.create(i);
-        m_acousticEchoCanceler.setEnabled(true);
-
-        m_noiseSuppressor = NoiseSuppressor.create(i);
-        m_noiseSuppressor.setEnabled(true);
-
-        if(b_useAGC) {
-            m_aAutomaticGainControl = AutomaticGainControl.create(i);
-            m_aAutomaticGainControl.setEnabled(true);
+    private void Setup_AEC_GainControl_NoiseSuppressor(int iAudioSessionId) {
+        mStrFeatures = "NoiseSuppressor=";
+        if(NoiseSuppressor.isAvailable()) {
+            m_noiseSuppressor = NoiseSuppressor.create(iAudioSessionId);
+            m_noiseSuppressor.setEnabled(true);
+            mStrFeatures += "y, ";
+        } else {
+            mStrFeatures += "n, ";
         }
+
+
+        mStrFeatures += "AcousticEchoCanceler=";
+        if(AcousticEchoCanceler.isAvailable()) {
+            m_acousticEchoCanceler = AcousticEchoCanceler.create(iAudioSessionId);
+            m_acousticEchoCanceler.setEnabled(true);
+            mStrFeatures += "y, ";
+        } else {
+            mStrFeatures += "n, ";
+        }
+
+        mStrFeatures += "AutomaticGainControl=";
+        if(AutomaticGainControl.isAvailable()) {
+            m_aAutomaticGainControl = AutomaticGainControl.create(iAudioSessionId);
+            m_aAutomaticGainControl.setEnabled(true);
+            mStrFeatures += "y";
+        } else {
+            mStrFeatures += "n";
+        }
+    }
+
+    public String getFeatures() {
+        return mStrFeatures;
     }
 
     void Pause() {
@@ -171,8 +181,8 @@ public class AudioOutgoing extends Thread {
         }
     }
 
-    private void configureMediaCodecEncoderAudio() {
-        MediaFormat format = MediaFormat.createAudioFormat(MIME_TYPE, SAMPLE_RATE, 1);
+    private void configureMediaCodecEncoderAudio(int iSampleRate) {
+        MediaFormat format = MediaFormat.createAudioFormat(MIME_TYPE, iSampleRate, 1);
         format.setInteger(MediaFormat.KEY_AAC_PROFILE, MediaCodecInfo.CodecProfileLevel.AACObjectLC);
         format.setInteger(MediaFormat.KEY_CHANNEL_MASK, AudioFormat.CHANNEL_IN_MONO);
         format.setInteger(MediaFormat.KEY_BIT_RATE, BIT_RATE);

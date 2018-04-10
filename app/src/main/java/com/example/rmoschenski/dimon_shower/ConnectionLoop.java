@@ -171,6 +171,7 @@ public class ConnectionLoop implements Runnable {
     }
 
     public void run() {
+        int iSampleRate = 16000;
         boolean bFirstConnect = true;
 
         CaptureRequest myCaptureRequest = mMainActivity.mRecordingRequestBuilder.build();
@@ -181,9 +182,10 @@ public class ConnectionLoop implements Runnable {
                 mSendDataThread.SetSocketChannel(socketChannel);
 
                 if(bFirstConnect) {
-                    int iAudioCapSessionID = mAudioOutgoing.Start(mSendDataThread);
+                    int iAudioCapSessionID = mAudioOutgoing.Start(mSendDataThread, iSampleRate);
+                    mMainActivity.setMessage(mAudioOutgoing.getFeatures());
                     mMainActivity.mVideoOutgoing.Start(mSendDataThread);
-                    mAudioIncoming.Start(iAudioCapSessionID);
+                    mAudioIncoming.Start(iAudioCapSessionID, iSampleRate);
                     bFirstConnect = false;
                 }
                 else {

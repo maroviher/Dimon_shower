@@ -15,19 +15,18 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 public class AudioIncoming {
     private static final String MIME_TYPE = "audio/mp4a-latm";
-    private static final int SAMPLE_RATE = 44100;
 
     MediaCodec mMediaCodecAudioDecoder;
     AudioTrack mAudioTrack;
     public BlockingQueue<Integer> mFifoAudioIn = new LinkedBlockingQueue<Integer>();
 
-    public void Start(int iAECid) {
-        mAudioTrack = new AudioTrack(AudioManager.MODE_IN_COMMUNICATION, SAMPLE_RATE,
+    public void Start(int iAECid, int iSampleRate) {
+        mAudioTrack = new AudioTrack(AudioManager.MODE_IN_COMMUNICATION, iSampleRate,
                 AudioFormat.CHANNEL_OUT_MONO,
-                AudioFormat.ENCODING_PCM_16BIT, SAMPLE_RATE * 2 / 10 * 2,
+                AudioFormat.ENCODING_PCM_16BIT, iSampleRate * 2 / 10 * 2,
                 AudioTrack.MODE_STREAM, iAECid);
 
-        if(null == (mMediaCodecAudioDecoder = InitAudioDecoder()))
+        if(null == (mMediaCodecAudioDecoder = InitAudioDecoder(iSampleRate)))
             return;
 
         mAudioTrack.play();
@@ -48,14 +47,14 @@ public class AudioIncoming {
         }
     }
 
-    private MediaCodec InitAudioDecoder() {
+    private MediaCodec InitAudioDecoder(int iSampleRate) {
         MediaCodec mediaCodec = null;
         try {
             mediaCodec = MediaCodec.createDecoderByType(MIME_TYPE);
             MediaFormat mMediaFormat = new MediaFormat();
             mMediaFormat.setString(MediaFormat.KEY_MIME, MIME_TYPE);
             mMediaFormat.setInteger(MediaFormat.KEY_CHANNEL_COUNT, 1);
-            mMediaFormat.setInteger(MediaFormat.KEY_SAMPLE_RATE, SAMPLE_RATE);
+            mMediaFormat.setInteger(MediaFormat.KEY_SAMPLE_RATE, iSampleRate);
             mediaCodec.setCallback(new MediaCodec.Callback() {
                 @Override
                 public void onInputBufferAvailable(@NonNull MediaCodec mediaCodec, int inputBufferId) {
