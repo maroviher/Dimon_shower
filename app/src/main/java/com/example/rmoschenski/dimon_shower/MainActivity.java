@@ -57,7 +57,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ad
     VideoOutgoing mVideoOutgoing = new VideoOutgoing();
 
     Queue<String> mQueueString = new ArrayDeque<>();
-    private TextView messageView;
+    public TextView messageView;
 
     public void setMessage(final String str) {
         final int iLine = Thread.currentThread().getStackTrace()[3].getLineNumber();
@@ -75,7 +75,7 @@ public class MainActivity extends Activity implements SurfaceHolder.Callback, Ad
         });
     }
 
-    String[] permissions= new String[]{Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA};
+    String[] permissions= new String[]{Manifest.permission.RECORD_AUDIO, Manifest.permission.CAMERA, Manifest.permission.MODIFY_AUDIO_SETTINGS};
     private  boolean checkPermissions() {
         int result;
         List<String> listPermissionsNeeded = new ArrayList<>();

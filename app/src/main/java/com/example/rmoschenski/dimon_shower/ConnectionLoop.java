@@ -161,8 +161,8 @@ public class ConnectionLoop implements Runnable {
                     (buf[3] & 0xFF) << 16 |
                     (buf[4] & 0xFF) << 24;
 
-            if ((tagAndLength.iFrameLen > 1000000)||(tagAndLength.iFrameLen < 2)) {
-                throw new Exception("ReadFrameLength iFrameLen=%d" + tagAndLength.iFrameLen);
+            if ((tagAndLength.iFrameLen > 2000000)||(tagAndLength.iFrameLen < 2)) {
+                throw new Exception("ReadFrameLength iFrameLen=" + tagAndLength.iFrameLen);
             }
             tagAndLength.dataType = buf[0];
             return tagAndLength;
@@ -171,7 +171,7 @@ public class ConnectionLoop implements Runnable {
     }
 
     public void run() {
-        int iSampleRate = 16000;
+        int iSampleRate = 48000;
         boolean bFirstConnect = true;
 
         CaptureRequest myCaptureRequest = mMainActivity.mRecordingRequestBuilder.build();
@@ -185,7 +185,7 @@ public class ConnectionLoop implements Runnable {
                     int iAudioCapSessionID = mAudioOutgoing.Start(mSendDataThread, iSampleRate);
                     mMainActivity.setMessage(mAudioOutgoing.getFeatures());
                     mMainActivity.mVideoOutgoing.Start(mSendDataThread);
-                    mAudioIncoming.Start(iAudioCapSessionID, iSampleRate);
+                    mAudioIncoming.Start(mMainActivity.messageView, iAudioCapSessionID, iSampleRate);
                     bFirstConnect = false;
                 }
                 else {
@@ -199,7 +199,7 @@ public class ConnectionLoop implements Runnable {
                     e.printStackTrace();
                 }
 
-                //if nothing recieved from the other side in 2 seconds, than close connection
+                //if nothing received from the other side in 2 seconds, than close connection
                 mSocketChannel.socket().setSoTimeout(2000);
 
                 while(mbConnectThreadShouldRun) {

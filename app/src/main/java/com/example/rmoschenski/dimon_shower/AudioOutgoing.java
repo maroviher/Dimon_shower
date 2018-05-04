@@ -20,7 +20,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 public class AudioOutgoing extends Thread {
 
     private static final String MIME_TYPE = "audio/mp4a-latm";
-    private static final int BIT_RATE = 32000;
+    private static final int BIT_RATE = 64000;
     MediaCodec mAudioCodec;
     private BlockingQueue<Integer> mFifoAudioInputBuffers = new LinkedBlockingQueue<>();
     AudioRecord m_audio_recorder;
@@ -31,9 +31,11 @@ public class AudioOutgoing extends Thread {
     NoiseSuppressor m_noiseSuppressor;
     AutomaticGainControl m_aAutomaticGainControl;
     String mStrFeatures;
+    int m_iSampleRate;
 
     public int Start(I_CompressedBufferAvailable iI_CompressedBufferAvailable, int iSampleRate) throws Exception {
         mI_CompressedBufferAvailable = iI_CompressedBufferAvailable;
+        m_iSampleRate = iSampleRate;
         configureMediaCodecEncoderAudio(iSampleRate);
         int min_buffer_size = AudioRecord.getMinBufferSize(iSampleRate, AudioFormat.CHANNEL_IN_MONO,
                 AudioFormat.ENCODING_PCM_16BIT);
@@ -45,7 +47,7 @@ public class AudioOutgoing extends Thread {
                 iSampleRate,                         // sample rate, hz
                 AudioFormat.CHANNEL_IN_MONO,                      // channels
                 AudioFormat.ENCODING_PCM_16BIT,                        // audio format
-                iSampleRate * 2 / 10);                     // buffer size 1/10 sec
+                iSampleRate * 20 / 1);                     // buffer size 1/20 sec
 
         if (m_audio_recorder.getState() != AudioRecord.STATE_INITIALIZED) {
             throw new Exception("AudioRecord STATE_INITIALIZED");
@@ -117,7 +119,7 @@ public class AudioOutgoing extends Thread {
     }
 
     public void run() {
-        m_bRunning = true;
+        m_bRunning = true;long millis = 0;
         while (m_bAudioThreadShoudRun) {
             try {
                 int inputBufferId = -1;
@@ -135,11 +137,21 @@ public class AudioOutgoing extends Thread {
                 }
 
                 ByteBuffer inputBuffer = mAudioCodec.getInputBuffer(inputBufferId);
-                int read_result = m_audio_recorder.read(inputBuffer, inputBuffer.limit());
-                if (read_result == AudioRecord.ERROR_BAD_VALUE || read_result == AudioRecord.ERROR_INVALID_OPERATION) {
+                int read_result = m_audio_recorder.read(inputBuffer, /*inputBuffer.limit()*/m_iSampleRate / 20);
+                if (read_result < 0) {
                     Log.e("AudioSoftwarePoller", "Read error");
-                    break;
                 }
+                if (read_result == 0) {//recording stopped, just sleep
+                    try {
+                        Thread.sleep(50);
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                /*long millis_tmp = System.currentTimeMillis();
+                Log.d("", "delta="+(millis_tmp-millis)+", read_result="+read_result);
+                millis = millis_tmp;*/
 
                 mAudioCodec.queueInputBuffer(inputBufferId, 0, read_result, 0, 0);
             } catch (IllegalStateException ex) {
@@ -202,7 +214,7 @@ public class AudioOutgoing extends Thread {
                     e.printStackTrace();
                 }
             }
-
+            long millis = 0;
             @Override
             public void onOutputBufferAvailable(@NonNull MediaCodec mediaCodec, int inputBufferId, @NonNull MediaCodec.BufferInfo bufferInfo) {
                 if(bufferInfo.flags == MediaCodec.BUFFER_FLAG_CODEC_CONFIG) {
@@ -217,6 +229,13 @@ public class AudioOutgoing extends Thread {
                 myOutputBuffer.iAudioOrVideo = MyOutputBuffer.iBufType_Audio;
                 myOutputBuffer.mediaCodec = mediaCodec;
                 myOutputBuffer.mbufferID = inputBufferId;
+
+
+                /*long millis_tmp = System.currentTimeMillis();
+                Log.d("", "delta="+(millis_tmp-millis)+" i="+inputBufferId+" iFrameLen="+mediaCodec.getOutputBuffer(inputBufferId).limit()+
+                        " dataType="+myOutputBuffer.iAudioOrVideo);
+                millis = millis_tmp;*/
+
                 mI_CompressedBufferAvailable.CompressedBufferAvailable(myOutputBuffer);
             }
 

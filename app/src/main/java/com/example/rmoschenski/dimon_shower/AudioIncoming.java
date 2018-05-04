@@ -5,8 +5,10 @@ import android.media.AudioManager;
 import android.media.AudioTrack;
 import android.media.MediaCodec;
 import android.media.MediaFormat;
+import android.provider.Settings;
 import android.support.annotation.NonNull;
 import android.util.Log;
+import android.widget.TextView;
 
 import java.nio.ByteBuffer;
 import java.util.concurrent.BlockingQueue;
@@ -19,18 +21,66 @@ public class AudioIncoming {
     MediaCodec mMediaCodecAudioDecoder;
     AudioTrack mAudioTrack;
     public BlockingQueue<Integer> mFifoAudioIn = new LinkedBlockingQueue<Integer>();
+    int m_iPCM_DataWrote = 0, m_iNotificationPeriod, m_iSampleRate;
+    TextView m_messageView;
 
-    public void Start(int iAECid, int iSampleRate) {
+    public void Start(TextView messageView, int iAECid, int iSampleRate) {
+        m_iSampleRate = iSampleRate;
+        m_messageView = messageView;
+        Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
         mAudioTrack = new AudioTrack(AudioManager.MODE_IN_COMMUNICATION, iSampleRate,
                 AudioFormat.CHANNEL_OUT_MONO,
-                AudioFormat.ENCODING_PCM_16BIT, iSampleRate * 2 / 10 * 2,
+                AudioFormat.ENCODING_PCM_16BIT, iSampleRate*2,
                 AudioTrack.MODE_STREAM, iAECid);
+
+        m_iNotificationPeriod = iSampleRate/2;
+        mAudioTrack.setPositionNotificationPeriod(m_iNotificationPeriod);//onPeriodicNotification gets called every 500ms
+        mAudioTrack.setPlaybackPositionUpdateListener(new AudioTrack.OnPlaybackPositionUpdateListener() {
+            @Override
+            public void onMarkerReached(AudioTrack audioTrack) {}
+
+            int iOldSampleRate = m_iSampleRate;
+            @Override
+            public void onPeriodicNotification(AudioTrack audioTrack) {
+
+                int i_l = m_iSampleRate/10, i_m = m_iSampleRate/8, i_r = m_iSampleRate/6, i_congestion = m_iSampleRate/4;
+                double adjust = 1.003;
+                int iNewSampleRate = 0;
+                int m_iDelta = m_iPCM_DataWrote - mAudioTrack.getPlaybackHeadPosition();
+                if(m_iDelta >= i_congestion) {//we have a real congestion, play it quick
+                    iNewSampleRate = (int) (m_iSampleRate * 2);
+                }
+                else if(m_iDelta >= i_r) {//play quicker
+                    iNewSampleRate = (int) (m_iSampleRate * adjust);
+                }
+                else if((m_iDelta < i_m) && (m_iDelta >= i_l)) {//play with native speed
+                    iNewSampleRate = m_iSampleRate;
+                }
+                else if(m_iDelta < i_l) {//play slower
+                    iNewSampleRate = (int) (m_iSampleRate / adjust);
+                }
+
+                if(iOldSampleRate != iNewSampleRate) {
+                    mAudioTrack.setPlaybackRate(iNewSampleRate);
+                    iOldSampleRate = iNewSampleRate;
+                }
+                double mytime1 = System.currentTimeMillis();
+                m_messageView.setText(" getUnderrunCount=" + mAudioTrack.getUnderrunCount() + " delta=" + m_iDelta + " rate="+mAudioTrack.getPlaybackRate());
+                //Log.d("", "ms="+(mytime1 - mytime)+" getUnderrunCount=" + mAudioTrack.getUnderrunCount() + " delta=" + m_iDelta + " rate="+mAudioTrack.getPlaybackRate());
+            }
+          });
 
         if(null == (mMediaCodecAudioDecoder = InitAudioDecoder(iSampleRate)))
             return;
 
         mAudioTrack.play();
         mMediaCodecAudioDecoder.start();
+    }
+
+    public void IncPcmDataCount(int i) {
+        synchronized (this) {
+            m_iPCM_DataWrote += i;
+        }
     }
 
     public void Stop() {
@@ -70,7 +120,9 @@ public class AudioIncoming {
                 public void onOutputBufferAvailable(@NonNull MediaCodec mediaCodec, int inputBufferId, @NonNull MediaCodec.BufferInfo bufferInfo) {
                     ByteBuffer buf = mediaCodec.getOutputBuffer(inputBufferId);
                     //Log.d("onOutputBufferAvailable", "id=" + inputBufferId + " size=" +  buf.limit());
-                    mAudioTrack.write(buf, buf.limit(), AudioTrack.WRITE_NON_BLOCKING);
+                    int iBufSize = buf.limit();
+                    mAudioTrack.write(buf, iBufSize, AudioTrack.WRITE_NON_BLOCKING);
+                    IncPcmDataCount(iBufSize/2);
                     mediaCodec.releaseOutputBuffer(inputBufferId, true);
                 }
 
@@ -82,7 +134,7 @@ public class AudioIncoming {
 
                 @Override
                 public void onOutputFormatChanged(@NonNull MediaCodec mediaCodec, @NonNull MediaFormat mediaFormat) {
-                    Log.d("onOutputFormatChanged", "");
+                    //Log.d("onOutputFormatChanged", "");
                 }
             } );
             mediaCodec.configure(mMediaFormat, null, null, 0);

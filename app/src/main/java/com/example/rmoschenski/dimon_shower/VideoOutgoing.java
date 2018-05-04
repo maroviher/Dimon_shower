@@ -84,6 +84,7 @@ public class VideoOutgoing {
                 myOutputBuffer.iAudioOrVideo = MyOutputBuffer.iBufType_Video;
                 myOutputBuffer.mediaCodec = mediaCodec;
                 myOutputBuffer.mbufferID = inputBufferId;
+                //Log.d("", "i="+inputBufferId+" iFrameLen="+mediaCodec.getOutputBuffer(inputBufferId).limit()+" dataType="+myOutputBuffer.iAudioOrVideo);
                 mI_CompressedBufferAvailable.CompressedBufferAvailable(myOutputBuffer);
             }
 
