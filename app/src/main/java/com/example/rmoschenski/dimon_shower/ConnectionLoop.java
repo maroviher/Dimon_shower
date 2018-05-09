@@ -199,8 +199,8 @@ public class ConnectionLoop implements Runnable {
                     e.printStackTrace();
                 }
 
-                //if nothing received from the other side in 2 seconds, than close connection
-                mSocketChannel.socket().setSoTimeout(2000);
+                //if nothing received from the other side in 3 seconds, than close connection
+                mSocketChannel.socket().setSoTimeout(3000);
 
                 while(mbConnectThreadShouldRun) {
                     try {

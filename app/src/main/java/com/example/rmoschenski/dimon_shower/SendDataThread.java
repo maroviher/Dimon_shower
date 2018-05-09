@@ -111,15 +111,17 @@ public class SendDataThread extends Thread implements I_CompressedBufferAvailabl
                 bbuf.put(bbufCodec);
                 bbuf.flip();
 
-                if(bbufCodec.limit() + 5 != bbuf.limit())
-                    Log.d("sdf", "asdf");
-                int iToSend = bbuf.limit();
-                int iSent = 0;
-                while(iSent < iToSend)
-                    iSent += mSocketChannel.write(bbuf);
+                /*if(bbufCodec.limit() + 5 != bbuf.limit())
+                    Log.d("sdf", "asdf");*/
+
+                while(bbuf.hasRemaining())
+                    mSocketChannel.write(bbuf);
+
             } catch (IllegalStateException ise) {
                 ise.printStackTrace();
             } catch (ClosedChannelException cce) {
+                //connection lost, do nothing and keep go on, to discard all unsent buffers
+            } catch (IOException cce) {
                 //connection lost, do nothing and keep go on, to discard all unsent buffers
             } catch (Exception e) {
                 e.printStackTrace();
