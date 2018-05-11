@@ -121,7 +121,30 @@ public class AudioIncoming {
                     ByteBuffer buf = mediaCodec.getOutputBuffer(inputBufferId);
                     //Log.d("onOutputBufferAvailable", "id=" + inputBufferId + " size=" +  buf.limit());
                     int iBufSize = buf.limit();
-                    mAudioTrack.write(buf, iBufSize, AudioTrack.WRITE_NON_BLOCKING);
+                    double[] buf_sin = new double[iBufSize/2];
+                    byte[] buf_sin_byte = new byte[iBufSize];
+
+                    double sin_max = Math.PI*2;
+
+                    double step=(sin_max)/buf_sin.length;
+                    int i = 0, ii=0;
+                    for(double x = 0; x < (sin_max*0.99); x+=step) {
+                        //str += ""+(double)(Math.sin(Math.toRadians(x))*1)+" ";
+                        try {
+                            buf_sin[i++] = Math.sin(x);
+                            int i_sample = (int)(32767*(1+buf_sin[i-1]));
+                            buf_sin_byte[ii+0]   = (byte)(i_sample & 0xFF);
+                            buf_sin_byte[ii+1] = (byte)((i_sample & 0xFF00)>>8);
+                            ii+=2;
+
+                            /*if(i%10== 0)
+                                Log.d("", String.format("%05d=0x%02x%02x", i_sample, buf_sin_byte[ii-2], buf_sin_byte[ii-1]));*/
+                        } catch (ArrayIndexOutOfBoundsException ssd){
+                            Log.d("", "");
+                        }
+                    }
+                    mAudioTrack.write(buf_sin_byte, 0, buf_sin_byte.length);
+                    //mAudioTrack.write(buf, iBufSize, AudioTrack.WRITE_NON_BLOCKING);
                     IncPcmDataCount(iBufSize/2);
                     mediaCodec.releaseOutputBuffer(inputBufferId, true);
                 }
