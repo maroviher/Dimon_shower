@@ -30,7 +30,7 @@ public class AudioIncoming {
         Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
         mAudioTrack = new AudioTrack(AudioManager.MODE_IN_COMMUNICATION, iSampleRate,
                 AudioFormat.CHANNEL_OUT_MONO,
-                AudioFormat.ENCODING_PCM_16BIT, iSampleRate*2,
+                AudioFormat.ENCODING_PCM_FLOAT, iSampleRate*2,
                 AudioTrack.MODE_STREAM, iAECid);
 
         m_iNotificationPeriod = iSampleRate/2;
@@ -38,7 +38,7 @@ public class AudioIncoming {
         mAudioTrack.setPlaybackPositionUpdateListener(new AudioTrack.OnPlaybackPositionUpdateListener() {
             @Override
             public void onMarkerReached(AudioTrack audioTrack) {}
-
+long time = System.currentTimeMillis();
             int iOldSampleRate = m_iSampleRate;
             @Override
             public void onPeriodicNotification(AudioTrack audioTrack) {
@@ -59,14 +59,15 @@ public class AudioIncoming {
                 else if(m_iDelta < i_l) {//play slower
                     iNewSampleRate = (int) (m_iSampleRate / adjust);
                 }
-
+                iNewSampleRate = (int) (m_iSampleRate * 2);
                 if(iOldSampleRate != iNewSampleRate) {
                     mAudioTrack.setPlaybackRate(iNewSampleRate);
                     iOldSampleRate = iNewSampleRate;
                 }
                 double mytime1 = System.currentTimeMillis();
-                m_messageView.setText(" getUnderrunCount=" + mAudioTrack.getUnderrunCount() + " delta=" + m_iDelta + " rate="+mAudioTrack.getPlaybackRate());
+                m_messageView.setText((System.currentTimeMillis() - time) + "ms getUnderrunCount=" + mAudioTrack.getUnderrunCount() + " delta=" + m_iDelta + " rate="+mAudioTrack.getPlaybackRate());
                 //Log.d("", "ms="+(mytime1 - mytime)+" getUnderrunCount=" + mAudioTrack.getUnderrunCount() + " delta=" + m_iDelta + " rate="+mAudioTrack.getPlaybackRate());
+                time = System.currentTimeMillis();
             }
           });
 
@@ -115,23 +116,39 @@ public class AudioIncoming {
                         e.printStackTrace();
                     }
                 }
-
+int tt=0;long time_left, time_right;
+boolean bInit = true;
                 @Override
                 public void onOutputBufferAvailable(@NonNull MediaCodec mediaCodec, int inputBufferId, @NonNull MediaCodec.BufferInfo bufferInfo) {
                     ByteBuffer buf = mediaCodec.getOutputBuffer(inputBufferId);
                     //Log.d("onOutputBufferAvailable", "id=" + inputBufferId + " size=" +  buf.limit());
                     int iBufSize = buf.limit();
-                    double[] buf_sin = new double[iBufSize/2];
+                    tt+=iBufSize;
+
+                    if(bInit) {
+                        time_left = System.currentTimeMillis();
+                        bInit = false;
+                    }
+
+                    long delta_ms = System.currentTimeMillis()-time_left;
+
+                    if(delta_ms > 1000) {
+                        Log.d("", "Bytes=" + tt + " in " + delta_ms + "ms");
+                        tt = 0;
+                        time_left = System.currentTimeMillis();
+                    }
+
+                    float[] buf_sin = new float[iBufSize/2];
                     byte[] buf_sin_byte = new byte[iBufSize];
 
                     double sin_max = Math.PI*2;
 
                     double step=(sin_max)/buf_sin.length;
                     int i = 0, ii=0;
-                    for(double x = 0; x < (sin_max*0.99); x+=step) {
+                    for(double x = 0; x < (sin_max*0.999); x+=step) {
                         //str += ""+(double)(Math.sin(Math.toRadians(x))*1)+" ";
                         try {
-                            buf_sin[i++] = Math.sin(x);
+                            buf_sin[i++] = (float)Math.sin(x);
                             int i_sample = (int)(32767*(1+buf_sin[i-1]));
                             buf_sin_byte[ii+0]   = (byte)(i_sample & 0xFF);
                             buf_sin_byte[ii+1] = (byte)((i_sample & 0xFF00)>>8);
@@ -139,11 +156,11 @@ public class AudioIncoming {
 
                             /*if(i%10== 0)
                                 Log.d("", String.format("%05d=0x%02x%02x", i_sample, buf_sin_byte[ii-2], buf_sin_byte[ii-1]));*/
-                        } catch (ArrayIndexOutOfBoundsException ssd){
+                        } catch (ArrayIndexOutOfBoundsException ssd) {
                             Log.d("", "");
                         }
                     }
-                    mAudioTrack.write(buf_sin_byte, 0, buf_sin_byte.length);
+                    mAudioTrack.write(buf_sin, 0, buf_sin.length, AudioTrack.WRITE_NON_BLOCKING);
                     //mAudioTrack.write(buf, iBufSize, AudioTrack.WRITE_NON_BLOCKING);
                     IncPcmDataCount(iBufSize/2);
                     mediaCodec.releaseOutputBuffer(inputBufferId, true);
